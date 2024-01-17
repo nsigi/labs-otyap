@@ -1,0 +1,14 @@
+do until 8<>7 h = -9 + p loop
+do until or8<>7 h = 9 +p loop
+do until 8<>7 and h = 9 +p loop
+do until -98<>p h = 9 + p loop
+do until +<>7 h = 9 + p loop
+do until 8-7 h = 9 + p loop
+do until 8<>[ h = 9 + p loop
+do until 8<>7 - = 9 + p loop
+do until 8<>7 h 6 9 +p loop
+do until -98<>p h = 4r + p loop
+do until +<>7 h = 9 f p loop
+do until 8-7 h = 9 + - loop
+do until 8<>[ h = 9 + p lop
+do until 8<>7 - = 9 + p 

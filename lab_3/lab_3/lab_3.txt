@@ -1,0 +1,213 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <cstring>
+using namespace std;
+
+//состояния автомата
+enum states { S, A, B, C, N, Z, F, Q, P, E};
+
+enum lexType {id, vl, co, ao, eq, wl, kw};
+
+lexType matrTypes[9][7]{
+	//          S,  A,  B,  C,  N,  Z,  F
+	/*letters*/ id, id, co, co, wl, wl, wl,
+	/*nums*/    vl, id, co, co, vl, wl, wl,
+	/* + */     ao, id, co, co, vl, wl, wl,
+	/* - */     ao, id, co, co, vl, wl, wl,
+	/* > */     co, id, co, co, vl, wl, wl,
+	/* < */     co, id, co, co, vl, wl, wl,
+	/* = */     eq, id, co, co, vl, wl, wl,
+	/*other*/   wl, wl, co, co, wl, wl, wl,
+	/*sep*/     wl, id, co, co, vl, vl, wl,
+};
+
+//матрица состояний
+states matrSt[9][7]{
+	//          S, A, B, C, N, Z, F
+	/*letters*/ A, A, P, P, F, P, F,
+	/*nums*/    N, A, P, P, N, N, F,
+	/* + */     E, P, P, P, P, P, P,
+	/* - */     E, P, P, P, P, P, P,
+	/* > */     B, P, P, E, P, P, P,
+	/* < */     C, P, P, P, P, P, P,
+	/* = */     E, P, E, E, P, P, P,
+	/*other*/   F, F, P, P, F, P, F,
+	/*sep*/     S, P, P, P, P, P, P
+	
+};
+
+struct Lex {
+	char* type; // тип лексемы
+	char* str; //текст лексемы
+};
+
+//определение типа считываемого сиимвола
+int setSign(char c) {
+	if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) return 0; //letters - 0
+	if (c >= '0' && c <= '9') return 1; //nums - 1
+	if (c == ' ' || c == '\n' || c == '\t' || c == '\0') return 8; //sep - 8
+	switch (c) {
+	case '+': return 2; // '+' - 2
+	case '-': return 3 ;// '-' - 3
+	case '>': return 4; // '>' - 4
+	case '<': return 5; // '<' - 5
+	case '=': return 6; // '=' - 6
+	}
+	return 7; // other - 7
+};
+
+//составление лексемы
+char* createLex(char* str, int firstPos, int lastPos) {
+	//выделяем память под нашу лексему
+	char* word = new char[lastPos - firstPos + 1];
+
+	int i;
+	//копируование части подстроки, как лексемы
+	for (i = 0; firstPos ^ lastPos; word[i++] = str[firstPos++]);
+	word[i] = '\0';
+	return word;
+}
+
+lexType checkKeyword(char*& str) {
+	if ((strcmp(str, "do")&&strcmp(str, "until")&&strcmp(str, "loop")))
+		return id;
+	return kw;
+}
+
+lexType checkId(char*& str) {
+	int a = strlen(str);
+	if (a <= 5)
+		return id;
+	return wl;
+}
+
+lexType checkVl(char*& str) {
+	int value = atoi(str);
+	if (value > -32769 && value < 32768)
+		return vl;
+	return wl;
+}
+
+char* setType(int t) {
+	char* pType = new char[3];
+	char* pT = pType;
+	switch (t) {
+	case 0:  {*pType++ = 'i'; *pType++ = 'd'; break;}
+	case 1:  {*pType++ = 'v'; *pType++ = 'l'; break;}
+	case 2:  {*pType++ = 'c'; *pType++ = 'o'; break;}
+	case 3:  {*pType++ = 'a'; *pType++ = 'o'; break;}
+	case 4:  {*pType++ = 'e'; *pType++ = 'q'; break;}
+	case 5:  {*pType++ = 'w'; *pType++ = 'l'; break;}
+	case 6:  {*pType++ = 'k'; *pType++ = 'w'; break;}
+	}
+
+	*pType = '\0';
+	return pT;
+}
+
+void findWords(char* str, int size, vector<Lex>& words) {
+	//words - найденые слова
+
+	int fPos, pos, curCh; // pos - текущая позиция, fPos - позиция начала нового слова
+	lexType type;
+	pos = 0;
+	states curSt = states::S; // текущее состояние автомата
+	Lex lexeme; // текущая лексема
+	bool stRollback;
+
+	while (pos ^ size) {
+		curCh = setSign(str[pos]);
+		type = matrTypes[curCh][curSt];
+		//задаем начальную позицию слова, когда в начальном состоянии обнаруживается непробельный символ
+		if (curSt == states::S) fPos = pos;
+
+		//определяем состояние в соответсвии с матрицей состояний
+		curSt = matrSt[curCh][curSt];
+
+		stRollback = curSt == states::P;
+
+		//записываем слово в наш список (вектор), если автомат перешел в завершающие состояние и лексема корректна
+		if (stRollback||curSt == states::E) {
+			int tPos = stRollback ? pos : pos + 1;
+			lexeme.str = createLex(str, fPos, tPos);
+			switch (type) {
+			case id: { type = checkId(lexeme.str);break; }
+			case vl: { type = checkVl(lexeme.str);break; }
+			default: break;
+			}
+			if (!type)
+				type = checkKeyword(lexeme.str);
+			lexeme.type = setType(type);
+			words.push_back(lexeme);
+
+			curSt = states::S;
+		}
+
+		if (!stRollback) ++pos;
+	}
+}
+
+//функция записи слов в файл и вывод в консоль
+void outputW(vector<Lex>& words, int size) {
+	//открываем файловый поток вывода
+	ofstream fOut("output.txt", ios_base::trunc);
+	
+	for (int i = 0; i < size;++i) 
+		fOut << words[i].str << '[' << words[i].type << ']' << ' ';
+
+	fOut << endl;
+
+	for (int i = 0; i < size;++i)
+		if (!strcmp(words[i].type, "id"))
+			fOut << words[i].str << ' ';
+
+	fOut << endl;
+
+	for (int i = 0; i < size;++i)
+		if (!strcmp(words[i].type, "vl"))
+			fOut << words[i].str << ' ';
+
+	//закрываем поток вывода
+	fOut.close();
+}
+
+int main() {
+	setlocale(LC_ALL, "Russian");
+
+	//открываем файловый поток ввода
+	ifstream fIn("input.txt");
+	if (fIn) {
+		//узнаем количество читаемых символов в файле и возвращаемся обратно в начало файла
+		fIn.seekg(0, ios::end);
+		int size = fIn.tellg();
+		++size;
+		fIn.seekg(0, ios::beg);
+
+		char* str = new char[size] {};
+
+		fIn.getline(str, size, '\0');
+
+		//закрываем поток ввода
+		fIn.close();
+
+		vector<Lex> words; //список слов
+		findWords(str, size, words);
+
+		int nSize = words.size();
+
+		outputW(words, nSize);
+
+		//освобождение памяти для всего списка слов
+		for (int i = 0; i ^ nSize; ++i) {
+			delete[] words[i].str;
+			delete[] words[i].type;
+		}
+		delete[]str;
+	}
+	else {
+		cout << "Ошибка открытия файла";
+	}
+
+	return 0;
+}

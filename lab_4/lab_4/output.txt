@@ -1,0 +1,2 @@
+do[do] until[un] a[id] do[do] until[un] ;;&[wl] a[id] b[id] =[eq] b[id] loop[lp] 
+3 co eq id lo

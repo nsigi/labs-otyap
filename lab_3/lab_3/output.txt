@@ -1,0 +1,3 @@
+g[id] >[co] c[id] =[eq] 7[vl] 
+g c 
+7 
